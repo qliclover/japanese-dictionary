@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日语字典</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #fafbfc; }
+        .navbar { background: white; border-bottom: 1px solid #e1e4e8; padding: 1rem 2rem; position: sticky; top: 0; z-index: 100; }
+        .navbar-content { max-width: 1400px; margin: 0 auto; display: flex; gap: 1.5rem; align-items: center; justify-content: space-between; }
+        .navbar-title { font-size: 1.25rem; font-weight: 600; flex-shrink: 0; min-width: 120px; }
+        .navbar-search { flex: 1; max-width: 500px; position: relative; }
+        .navbar-search input { width: 100%; padding: 0.6rem 0.75rem 0.6rem 2.25rem; border: 1px solid #d1d5da; border-radius: 6px; outline: none; background: #fafbfc; font-size: 0.875rem; }
+        .navbar-search input:focus { background: white; border-color: #0366d6; box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1); }
+        .search-icon { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); color: #6a737d; pointer-events: none; font-size: 0.875rem; }
+        .navbar-nav { display: flex; gap: 0.75rem; flex-wrap: nowrap; flex-shrink: 0; }
+        .btn { padding: 0.6rem 1.1rem; border: 1px solid #d1d5da; background: white; font-size: 0.875rem; cursor: pointer; border-radius: 6px; white-space: nowrap; color: #24292e; font-weight: 500; transition: all 0.15s; }
+        .btn:hover { background: #f6f8fa; border-color: #a0a0a0; }
+        .btn-primary { background: #0366d6; color: white; border-color: #0366d6; }
+        .btn-primary:hover { background: #0256c7; border-color: #0256c7; }
+        .btn-danger:hover { background: #ffeef0; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .folder-tree { background: white; border: 1px solid #e1e4e8; border-radius: 6px; padding: 0.5rem; max-height: 350px; overflow-y: auto; margin-bottom: 2rem; }
+        .folder-row { padding: 0.5rem 0.75rem; margin: 2px 0; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem; }
+        .folder-row:hover { background: #f6f8fa; }
+        .folder-row.active { background: #e1f0ff; }
+        .arrow { width: 16px; text-align: center; font-size: 0.8rem; user-select: none; }
+        .name { flex: 1; }
+        .stats { background: white; border: 1px solid #e1e4e8; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 6px; display: flex; justify-content: space-between; font-size: 0.875rem; }
+        .word-list { background: white; border: 1px solid #e1e4e8; border-radius: 6px; overflow: hidden; }
+        .word-item { border-bottom: 1px solid #f6f8fa; padding: 1.25rem 1.5rem 1.25rem 5rem; display: flex; gap: 3rem; align-items: center; position: relative; }
+        .word-item:hover { background: #fafbfc; }
+        .folder-tag { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); background: #f1f3f5; color: #6a737d; padding: 0.25rem 0.6rem; font-size: 0.7rem; border-radius: 4px; min-width: 50px; text-align: center; }
+        .word-field { min-width: 100px; }
+        .word-field .label { font-size: 0.65rem; color: #999; margin-bottom: 0.2rem; }
+        .word-field .value { font-size: 0.85rem; }
+        .word-field.primary .value { font-size: 1.1rem; font-weight: 500; }
+        .word-actions { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); }
+        .word-actions button { padding: 0.3rem 0.6rem; border: 1px solid #e1e4e8; background: white; cursor: pointer; border-radius: 4px; font-size: 0.9rem; }
+        .word-actions button.active { background: #fff3b0; border-color: #d4b106; }
+        .pagination { background: white; border: 1px solid #e1e4e8; padding: 1rem; margin-top: 1rem; border-radius: 6px; display: flex; justify-content: center; gap: 0.5rem; }
+        .page-btn { padding: 0.4rem 0.8rem; border: 1px solid #e1e4e8; background: white; cursor: pointer; border-radius: 6px; }
+        .page-btn:hover:not(:disabled) { background: #f6f8fa; }
+        .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .page-btn.active { background: #0366d6; color: white; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; }
+        .modal.show { display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 2rem; border-radius: 8px; min-width: 450px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal-content h3 { margin-bottom: 1rem; }
+        .modal-content input, .modal-content select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; margin-bottom: 1rem; border-radius: 4px; }
+        .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+        .notebook-mode { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; display: none; flex-direction: column; }
+        .notebook-mode.active { display: flex; }
+        .notebook-header { padding: 1.5rem 2rem; border-bottom: 1px solid #e1e4e8; }
+        .notebook-title-row { display: flex; justify-content: space-between; margin-bottom: 1.5rem; }
+        .notebook-search { position: relative; margin-bottom: 1rem; }
+        .notebook-search input { width: 100%; padding: 0.65rem 1rem 0.65rem 2.5rem; border: 1px solid #d1d5da; border-radius: 6px; outline: none; background: #fafbfc; }
+        .notebook-controls { display: flex; gap: 0.5rem; }
+        .notebook-content { flex: 1; overflow-y: auto; }
+        .notebook-item { border-bottom: 1px solid #f6f8fa; padding: 1.25rem 1.5rem; display: flex; gap: 3rem; align-items: center; position: relative; }
+        .notebook-item:hover { background: #fafbfc; }
+        .notebook-word-info { flex: 1; display: flex; gap: 3rem; align-items: center; }
+        .notebook-word { font-size: 1.1rem; font-weight: 500; min-width: 120px; }
+        .notebook-details { display: flex; gap: 3rem; color: #6a737d; font-size: 0.85rem; flex: 1; }
+        .notebook-actions { position: absolute; right: 1.5rem; }
+        .empty { text-align: center; color: #999; padding: 4rem; }
+        .study-mode { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 4000; display: none; flex-direction: column; }
+        .study-mode.active { display: flex; }
+        .study-header { padding: 1.5rem 2rem; border-bottom: 1px solid #e1e4e8; display: flex; justify-content: space-between; }
+        .study-content { flex: 1; display: flex; align-items: center; justify-content: center; }
+        .study-card { max-width: 800px; text-align: center; }
+        .study-word { font-size: 4rem; font-weight: 600; margin-bottom: 2rem; }
+        .study-details { font-size: 1.5rem; color: #6a737d; line-height: 2.5; }
+        .study-details.hidden { display: none; }
+        .study-controls { padding: 1.5rem; border-top: 1px solid #e1e4e8; display: flex; justify-content: center; gap: 1rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="navbar-title">日语字典</div>
+            <div class="navbar-search">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="mainSearch" placeholder="搜索单词...">
+            </div>
+            <div class="navbar-nav">
+                <button class="btn" id="btnNewFolder">新建文件夹</button>
+                <button class="btn" id="btnUpload">上传文件</button>
+                <button class="btn btn-primary" id="btnStudy">开始学习</button>
+                <button class="btn" id="btnNotebook">生词本</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="folder-tree" id="folderTree"></div>
+        <div class="stats"><span id="stats">共 0 条</span><span id="pageInfo"></span></div>
+        <div class="word-list" id="wordList"></div>
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <div class="modal" id="modalNewFolder">
+        <div class="modal-content">
+            <h3>新建文件夹</h3>
+            <input type="text" id="inputFolderName" placeholder="输入文件夹名称">
+            <div class="modal-actions">
+                <button class="btn" id="btnCancelFolder">取消</button>
+                <button class="btn btn-primary" id="btnCreateFolder">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modalUpload">
+        <div class="modal-content">
+            <h3>上传文件</h3>
+            <label>选择文件夹：</label>
+            <select id="selectTargetFolder"><option value="">根目录</option></select>
+            <label>选择文件（可多选）：</label>
+            <input type="file" id="inputFiles" accept=".xlsx,.xls,.json" multiple>
+            <div class="modal-actions">
+                <button class="btn" id="btnCancelUpload">取消</button>
+                <button class="btn btn-primary" id="btnDoUpload">上传</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modalAddWord">
+        <div class="modal-content">
+            <h3>添加单词</h3>
+            <label>单词（日语）</label>
+            <input type="text" id="inputWord" placeholder="例：相容れない">
+            <label>读音</label>
+            <input type="text" id="inputReading" placeholder="例：あいいれない">
+            <label>意思</label>
+            <input type="text" id="inputMeaning" placeholder="例：互相矛盾">
+            <div class="modal-actions">
+                <button class="btn" id="btnCancelWord">取消</button>
+                <button class="btn btn-primary" id="btnAddWord">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="notebook-mode" id="notebookPage">
+        <div class="notebook-header">
+            <div class="notebook-title-row">
+                <span style="font-size: 1.3rem; font-weight: 600;">我的生词本</span>
+                <span style="margin-left: 1rem; color: #6a737d;">共 <span id="notebookCount">0</span> 个</span>
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <div class="notebook-search" style="flex: 1;">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="notebookSearch" placeholder="搜索...">
+                </div>
+                <div class="notebook-controls">
+                    <button class="btn" id="btnAddToNotebook">添加单词</button>
+                    <button class="btn btn-primary" id="btnCloseNotebook">关闭</button>
+                </div>
+            </div>
+        </div>
+        <div class="notebook-content">
+            <div id="notebookList"></div>
+        </div>
+    </div>
+
+    <div class="study-mode" id="studyPage">
+        <div class="study-header">
+            <div><strong>学习模式</strong> <span id="studyProgress"></span></div>
+            <button class="btn" id="btnExitStudy">退出</button>
+        </div>
+        <div class="study-content">
+            <div class="study-card">
+                <div class="study-word" id="studyWord">単語</div>
+                <div class="study-details" id="studyDetails"></div>
+            </div>
+        </div>
+        <div class="study-controls">
+            <button class="btn" id="btnToggleAnswer">显示/隐藏答案</button>
+            <button class="btn" id="btnPrevWord">上一个</button>
+            <button class="btn" id="btnNextWord">下一个</button>
+        </div>
+    </div>
+
+    <script>
+        const Dict = {
+            folders: {},
+            files: {},
+            collapsed: new Set(),
+            selected: null,
+            words: [],
+            notebook: [],
+            page: 1,
+            studyIndex: 0,
+            showAnswer: false
+        };
+
+        function init() {
+            loadData();
+            setupEvents();
+            renderTree();
+            renderWords();
+        }
+
+        function loadData() {
+            try {
+                const saved = localStorage.getItem('japaneseDict');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    Dict.folders = data.folders || {};
+                    Dict.files = data.files || {};
+                    Dict.collapsed = new Set(data.collapsed || []);
+                    Dict.notebook = data.notebook || [];
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem('japaneseDict', JSON.stringify({
+                    folders: Dict.folders,
+                    files: Dict.files,
+                    collapsed: Array.from(Dict.collapsed),
+                    notebook: Dict.notebook
+                }));
+            } catch (e) { console.error(e); }
+        }
+
+        function setupEvents() {
+            document.getElementById('btnNewFolder').onclick = () => showModal('modalNewFolder');
+            document.getElementById('btnUpload').onclick = () => { showModal('modalUpload'); updateFolderSelect(); };
+            document.getElementById('btnStudy').onclick = startStudy;
+            document.getElementById('btnNotebook').onclick = showNotebook;
+            
+            document.getElementById('btnCancelFolder').onclick = closeModals;
+            document.getElementById('btnCreateFolder').onclick = createFolder;
+            document.getElementById('btnCancelUpload').onclick = closeModals;
+            document.getElementById('btnDoUpload').onclick = uploadFiles;
+            document.getElementById('btnCancelWord').onclick = closeModals;
+            document.getElementById('btnAddWord').onclick = addWordToNotebook;
+            
+            document.getElementById('btnAddToNotebook').onclick = () => showModal('modalAddWord');
+            document.getElementById('btnCloseNotebook').onclick = closeNotebook;
+            document.getElementById('notebookSearch').oninput = renderNotebookList;
+            
+            document.getElementById('btnExitStudy').onclick = exitStudy;
+            document.getElementById('btnToggleAnswer').onclick = toggleAnswer;
+            document.getElementById('btnPrevWord').onclick = prevWord;
+            document.getElementById('btnNextWord').onclick = nextWord;
+            
+            document.getElementById('mainSearch').oninput = (e) => {
+                if (e.target.value.trim()) {
+                    searchAll(e.target.value);
+                } else {
+                    renderWords();
+                }
+            };
+        }
+
+        function showModal(id) {
+            document.getElementById(id).classList.add('show');
+        }
+
+        function closeModals() {
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));
+        }
+
+        function createFolder() {
+            const name = document.getElementById('inputFolderName').value.trim();
+            if (!name) return;
+            if (Dict.folders[name]) return alert('已存在');
+            Dict.folders[name] = [];
+            saveData();
+            closeModals();
+            renderTree();
+        }
+
+        async function uploadFiles() {
+            const input = document.getElementById('inputFiles');
+            const target = document.getElementById('selectTargetFolder').value;
+            const files = Array.from(input.files);
+            
+            for (const file of files) {
+                try {
+                    const data = await parseFile(file);
+                    const key = target ? `${target}/${file.name}` : file.name;
+                    Dict.files[key] = data;
+                    if (target) {
+                        if (!Dict.folders[target]) Dict.folders[target] = [];
+                        Dict.folders[target].push(file.name);
+                    }
+                } catch (e) { console.error(e); }
+            }
+            
+            input.value = '';
+            saveData();
+            closeModals();
+            renderTree();
+        }
+
+        async function parseFile(file) {
+            if (file.name.endsWith('.json')) {
+                const text = await file.text();
+                const json = JSON.parse(text);
+                const data = json.data || json;
+                return Array.isArray(data) ? data : [data];
+            } else {
+                const buffer = await file.arrayBuffer();
+                const wb = XLSX.read(buffer);
+                return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            }
+        }
+
+        function updateFolderSelect() {
+            const sel = document.getElementById('selectTargetFolder');
+            sel.innerHTML = '<option value="">根目录</option>' + 
+                Object.keys(Dict.folders).map(f => `<option value="${f}">${f}</option>`).join('');
+        }
+
+        function toggleFolder(name) {
+            Dict.collapsed.has(name) ? Dict.collapsed.delete(name) : Dict.collapsed.add(name);
+            saveData();
+            renderTree();
+        }
+
+        function selectAll() {
+            Dict.selected = { type: 'all' };
+            Dict.words = [];
+            Object.keys(Dict.files).forEach(key => {
+                const folder = key.includes('/') ? key.split('/')[0] : '根目录';
+                Dict.files[key].forEach(w => Dict.words.push({ ...w, _tag: folder }));
+            });
+            Dict.page = 1;
+            renderTree();
+            renderWords();
+        }
+
+        function selectFolder(name) {
+            Dict.selected = { type: 'folder', name };
+            Dict.words = [];
+            (Dict.folders[name] || []).forEach(fileName => {
+                const key = `${name}/${fileName}`;
+                if (Dict.files[key]) {
+                    Dict.files[key].forEach(w => Dict.words.push({ ...w, _tag: name }));
+                }
+            });
+            Dict.page = 1;
+            renderTree();
+            renderWords();
+        }
+
+        function selectFile(key) {
+            Dict.selected = { type: 'file', key };
+            const folder = key.includes('/') ? key.split('/')[0] : '根目录';
+            Dict.words = (Dict.files[key] || []).map(w => ({ ...w, _tag: folder }));
+            Dict.page = 1;
+            renderTree();
+            renderWords();
+        }
+
+        function countWords(name) {
+            return (Dict.folders[name] || []).reduce((s, f) => s + (Dict.files[`${name}/${f}`]?.length || 0), 0);
+        }
+
+        function renderTree() {
+            const tree = document.getElementById('folderTree');
+            const total = Object.values(Dict.files).reduce((s, a) => s + a.length, 0);
+            
+            let html = `<div class="folder-row ${Dict.selected?.type === 'all' ? 'active' : ''}" onclick="selectAll()">
+                <div class="arrow"></div><div class="name">📚 全部 (${total}条)</div></div>`;
+
+            Object.keys(Dict.folders).forEach(name => {
+                const collapsed = Dict.collapsed.has(name);
+                const active = Dict.selected?.type === 'folder' && Dict.selected.name === name;
+                const count = countWords(name);
+
+                html += `<div class="folder-row ${active ? 'active' : ''}">
+                    <div class="arrow" onclick="toggleFolder('${name}')">${collapsed ? '▶' : '▼'}</div>
+                    <div class="name" onclick="selectFolder('${name}')">📁 ${name} (${count}条)</div>
+                </div>`;
+
+                if (!collapsed) {
+                    (Dict.folders[name] || []).forEach(fileName => {
+                        const key = `${name}/${fileName}`;
+                        const active = Dict.selected?.type === 'file' && Dict.selected.key === key;
+                        html += `<div class="folder-row file ${active ? 'active' : ''}" style="margin-left:1.5rem">
+                            <div class="arrow"></div><div class="name" onclick="selectFile('${key}')">📄 ${fileName} (${Dict.files[key]?.length || 0}条)</div>
+                        </div>`;
+                    });
+                }
+            });
+
+            tree.innerHTML = html || '<div style="padding:1rem;color:#999">暂无文件</div>';
+        }
+
+        function searchAll(query) {
+            const all = [];
+            Object.keys(Dict.files).forEach(key => {
+                const folder = key.includes('/') ? key.split('/')[0] : '根目录';
+                Dict.files[key].forEach(w => all.push({ ...w, _tag: folder }));
+            });
+            Dict.words = all.filter(w => JSON.stringify(w).toLowerCase().includes(query.toLowerCase()));
+            Dict.page = 1;
+            renderWords();
+        }
+
+        function getFields(word) {
+            const r = {};
+            if (word.wordName) r['单词'] = word.wordName;
+            if (word.wordDesc) r['读音'] = word.wordDesc;
+            if (word.correctDesc) r['意思'] = word.correctDesc;
+            if (Object.keys(r).length === 0) {
+                Object.keys(word).forEach(k => {
+                    if (word[k] != null && typeof word[k] !== 'object' && k !== '_tag') r[k] = word[k];
+                });
+            }
+            return r;
+        }
+
+        function getWordId(word) {
+            const f = getFields(word);
+            return f['单词'] || JSON.stringify(word).substring(0, 50);
+        }
+
+        function isInNotebook(id) {
+            return Dict.notebook.some(i => i.id === id);
+        }
+
+        function toggleStar(id) {
+            const idx = Dict.notebook.findIndex(i => i.id === id);
+            if (idx > -1) {
+                Dict.notebook.splice(idx, 1);
+            } else {
+                const word = Dict.words.find(w => getWordId(w) === id);
+                if (word) {
+                    const f = getFields(word);
+                    Dict.notebook.push({
+                        id: id,
+                        word: f['单词'] || '---',
+                        reading: f['读音'] || '',
+                        meaning: f['意思'] || '',
+                        addedAt: new Date().toISOString()
+                    });
+                }
+            }
+            saveData();
+            renderWords();
+        }
+
+        function renderWords() {
+            const filtered = Dict.words;
+            const start = (Dict.page - 1) * 50;
+            const pageWords = filtered.slice(start, start + 50);
+            const pages = Math.ceil(filtered.length / 50);
+
+            document.getElementById('stats').textContent = `共 ${filtered.length} 条`;
+            document.getElementById('pageInfo').textContent = filtered.length > 0 ? `第 ${start + 1}-${Math.min(start + 50, filtered.length)} 条` : '';
+
+            const list = document.getElementById('wordList');
+            if (pageWords.length === 0) {
+                list.innerHTML = '<div class="empty">未找到结果</div>';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            list.innerHTML = pageWords.map(word => {
+                const fields = getFields(word);
+                const id = getWordId(word);
+                const starred = isInNotebook(id);
+                const tag = word._tag;
+                
+                const items = Object.entries(fields).map(([k, v]) => 
+                    `<div class="word-field ${k === '单词' ? 'primary' : ''}"><div class="label">${k}</div><div class="value">${v}</div></div>`
+                ).join('');
+                
+                return `<div class="word-item">
+                    ${tag ? `<div class="folder-tag">${tag}</div>` : ''}
+                    ${items}
+                    <div class="word-actions"><button class="${starred ? 'active' : ''}" onclick="toggleStar('${id}')">${starred ? '⭐' : '☆'}</button></div>
+                </div>`;
+            }).join('');
+
+            let pag = '';
+            if (pages > 1) {
+                pag += `<button class="page-btn" onclick="goPage(${Dict.page - 1})" ${Dict.page === 1 ? 'disabled' : ''}>上一页</button>`;
+                const s = Math.max(1, Dict.page - 2);
+                const e = Math.min(pages, Dict.page + 2);
+                for (let i = s; i <= e; i++) {
+                    pag += `<button class="page-btn ${i === Dict.page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+                }
+                pag += `<button class="page-btn" onclick="goPage(${Dict.page + 1})" ${Dict.page === pages ? 'disabled' : ''}>下一页</button>`;
+            }
+            document.getElementById('pagination').innerHTML = pag;
+        }
+
+        function goPage(p) {
+            Dict.page = p;
+            renderWords();
+            window.scrollTo(0, 0);
+        }
+
+        function showNotebook() {
+            document.getElementById('notebookPage').classList.add('active');
+            renderNotebookList();
+        }
+
+        function closeNotebook() {
+            document.getElementById('notebookPage').classList.remove('active');
+        }
+
+        function renderNotebookList() {
+            const search = document.getElementById('notebookSearch').value.toLowerCase().trim();
+            let display = Dict.notebook;
+            
+            if (search) {
+                display = Dict.notebook.filter(item => {
+                    const text = [item.word, item.reading, item.meaning].join(' ').toLowerCase();
+                    return text.includes(search);
+                });
+            }
+            
+            document.getElementById('notebookCount').textContent = Dict.notebook.length;
+            const list = document.getElementById('notebookList');
+            
+            if (Dict.notebook.length === 0) {
+                list.innerHTML = '<div class="empty"><div style="font-size:4rem">📖</div><div>生词本是空的</div></div>';
+                return;
+            }
+            
+            if (display.length === 0) {
+                list.innerHTML = '<div class="empty"><div style="font-size:3rem">🔍</div><div>未找到</div></div>';
+                return;
+            }
+            
+            list.innerHTML = [...display].reverse().map(item => 
+                `<div class="notebook-item">
+                    <div class="notebook-word-info">
+                        <div class="notebook-word">${item.word}</div>
+                        <div class="notebook-details">
+                            ${item.reading ? `<div>${item.reading}</div>` : ''}
+                            ${item.meaning ? `<div>${item.meaning}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="notebook-actions"><button class="btn btn-danger" onclick='removeFromNotebook("${item.id}")'>✕</button></div>
+                </div>`
+            ).join('');
+        }
+
+        function addWordToNotebook() {
+            const word = document.getElementById('inputWord').value.trim();
+            const reading = document.getElementById('inputReading').value.trim();
+            const meaning = document.getElementById('inputMeaning').value.trim();
+            if (!word) return alert('请输入单词');
+            
+            Dict.notebook.push({
+                id: word + '_' + Date.now(),
+                word: word,
+                reading: reading,
+                meaning: meaning,
+                addedAt: new Date().toISOString()
+            });
+            saveData();
+            closeModals();
+            renderNotebookList();
+        }
+
+        function removeFromNotebook(id) {
+            const idx = Dict.notebook.findIndex(i => i.id === id);
+            if (idx > -1) {
+                Dict.notebook.splice(idx, 1);
+                saveData();
+                renderNotebookList();
+            }
+        }
+
+        function startStudy() {
+            console.log('开始学习');
+            if (Dict.words.length === 0) return alert('请先选择文件或文件夹');
+            
+            // 随机打乱并选择20个单词
+            const shuffled = [...Dict.words].sort(() => Math.random() - 0.5);
+            const studyWords = shuffled.slice(0, Math.min(20, shuffled.length));
+            
+            Dict.studyWords = studyWords;
+            Dict.studyIndex = 0;
+            Dict.showAnswer = false;
+            
+            document.getElementById('studyPage').classList.add('active');
+            updateStudyCard();
+            
+            document.addEventListener('keydown', window.studyKeyHandler = (e) => {
+                if (e.target.tagName === 'INPUT') return;
+                if (e.key === ' ') { e.preventDefault(); toggleAnswer(); }
+                else if (e.key === 'ArrowLeft') { e.preventDefault(); prevWord(); }
+                else if (e.key === 'ArrowRight') { e.preventDefault(); nextWord(); }
+                else if (e.key === 'Escape') { e.preventDefault(); exitStudy(); }
+            });
+        }
+
+        function exitStudy() {
+            document.getElementById('studyPage').classList.remove('active');
+            if (window.studyKeyHandler) {
+                document.removeEventListener('keydown', window.studyKeyHandler);
+            }
+        }
+
+        function updateStudyCard() {
+            const word = Dict.studyWords[Dict.studyIndex];
+            if (!word) return;
+            const f = getFields(word);
+            
+            document.getElementById('studyWord').textContent = f['单词'] || '---';
+            let det = '';
+            if (f['读音']) det += `<div>读音：${f['读音']}</div>`;
+            if (f['意思']) det += `<div>意思：${f['意思']}</div>`;
+            
+            const detailsEl = document.getElementById('studyDetails');
+            detailsEl.innerHTML = det;
+            detailsEl.className = Dict.showAnswer ? 'study-details' : 'study-details hidden';
+            
+            document.getElementById('studyProgress').textContent = `${Dict.studyIndex + 1} / ${Dict.studyWords.length}`;
+        }
+
+        function toggleAnswer() {
+            Dict.showAnswer = !Dict.showAnswer;
+            updateStudyCard();
+        }
+
+        function nextWord() {
+            if (Dict.studyIndex < Dict.studyWords.length - 1) {
+                Dict.studyIndex++;
+                Dict.showAnswer = false;
+                updateStudyCard();
+            } else {
+                alert('已完成本轮学习！\n学习了 ' + Dict.studyWords.length + ' 个单词');
+                exitStudy();
+            }
+        }
+
+        function prevWord() {
+            if (Dict.studyIndex > 0) {
+                Dict.studyIndex--;
+                Dict.showAnswer = false;
+                updateStudyCard();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
